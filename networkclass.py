@@ -169,24 +169,73 @@ class Networks_Game:
         nx.set_node_attributes(self.graph, name='BTC', values=between)
         
         return True
+
+    def compute_unit_ranking(self):
+        metrics = {
+            "indegree": {node: self.graph.nodes[node].get("indegree", 0) for node in self.graph.nodes()},
+            "clustering": {node: self.graph.nodes[node].get("clustering", 0) for node in self.graph.nodes()},
+            "BTC": {node: self.graph.nodes[node].get("BTC", 0) for node in self.graph.nodes()},
+        }
+
+        minmax_metrics = {}
+        for metric_name, values in metrics.items():
+            values_list = list(values.values())
+            min_value = min(values_list) if values_list else 0
+            max_value = max(values_list) if values_list else 0
+            denominator = max_value - min_value
+
+            if denominator == 0:
+                minmax_metrics[metric_name] = {node: 0.0 for node in values}
+            else:
+                minmax_metrics[metric_name] = {
+                    node: (value - min_value) / denominator for node, value in values.items()
+                }
+
+        unit_ranking_score = {}
+        for node in self.graph.nodes():
+            unit_ranking_score[node] = round(
+                (
+                    minmax_metrics["indegree"][node]
+                    + minmax_metrics["clustering"][node]
+                    + minmax_metrics["BTC"][node]
+                )
+                / 3,
+                4,
+            )
+
+        ordered_nodes = sorted(unit_ranking_score.items(), key=lambda x: (-x[1], x[0]))
+        unit_ranking_position = {node: idx for idx, (node, _) in enumerate(ordered_nodes, start=1)}
+
+        nx.set_node_attributes(self.graph, name='ranking_score', values=unit_ranking_score)
+        nx.set_node_attributes(self.graph, name='ranking_position', values=unit_ranking_position)
+        return unit_ranking_score, unit_ranking_position
     
-    def visualize(self):
+    def visualize(self, is_admin=False):
         in_degree = dict(self.graph.in_degree())
         uniform_node_size = {node: 18 for node in self.graph.nodes()}
         nx.set_node_attributes(self.graph, name='adjusted_node_size', values=uniform_node_size)
+        self.compute_unit_ranking()
 
         node_highlight_color = 'blue'
         size_by_this_attribute = 'adjusted_node_size'
         title = 'Game of Networks Round ' + str(self.round)
 
-        HOVER_TOOLTIPS = [
-            ("User ID", "@index"),
-            ("Alias", "@alias"),
-            ("Indegree", "@indegree"),
-            ("Outdegree", "@outdegree"),
-            ("Clustering coefficient", "@clustering"),
-            ("Betwenness Centrality", "@BTC"),
-        ]
+        if is_admin:
+            HOVER_TOOLTIPS = [
+                ("User ID", "@index"),
+                ("Alias", "@alias"),
+                ("Ranking", "@ranking_position"),
+                ("Puntaje ranking", "@ranking_score"),
+                ("Indegree", "@indegree"),
+                ("Outdegree", "@outdegree"),
+                ("Clustering coefficient", "@clustering"),
+                ("Betwenness Centrality", "@BTC"),
+            ]
+        else:
+            HOVER_TOOLTIPS = [
+                ("Alias", "@alias"),
+                ("Ranking", "@ranking_position"),
+            ]
 
 
         plot = figure(tooltips=HOVER_TOOLTIPS,
