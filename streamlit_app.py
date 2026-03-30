@@ -79,18 +79,23 @@ def Changes_screen():
     if Round == 0:
         with st.form("NewConnections"):
             Available = st.session_state.Game.unconnectedOF(st.session_state.User.id)
+            available_options = [None] + Available
             "Choose 2 connections to add"
             "Connection 1"
-            add1 = st.selectbox("Add this connection", Available, key= "add1")
+            add1 = st.selectbox(
+                "Add this connection",
+                available_options,
+                key="add1",
+                format_func=lambda x: "-- No change --" if x is None else x,
+            )
             "Connection 2"
-            add2 = st.selectbox("Add this connection", Available, key= "add2")
+            add2 = st.selectbox(
+                "Add this connection",
+                available_options,
+                key="add2",
+                format_func=lambda x: "-- No change --" if x is None else x,
+            )
             submitted = st.form_submit_button("Submit")
-            
-            if len(Available) == 1:
-                add2 = None
-            if len(Available) == 0:
-                add1 = None
-                add2 = None
             
             if submitted:
                 
@@ -113,22 +118,31 @@ def Changes_screen():
         with st.form("NewConnections"):
             Available = st.session_state.Game.unconnectedOF(st.session_state.User.id)
             Connected = st.session_state.Game.connectionsOF(st.session_state.User.id)
+            available_options = [None] + Available
+            connected_options = [None] + Connected
             "Choose 2 connections to add"
             "Connection 1"
-            add1 = st.selectbox("Add this connection", Available, key= "add1")
+            add1 = st.selectbox(
+                "Add this connection",
+                available_options,
+                key="add1",
+                format_func=lambda x: "-- No change --" if x is None else x,
+            )
             "Connection 2"
-            add2 = st.selectbox("Add this connection", Available, key= "add2")
+            add2 = st.selectbox(
+                "Add this connection",
+                available_options,
+                key="add2",
+                format_func=lambda x: "-- No change --" if x is None else x,
+            )
             "Remove Connection"
-            rem = st.selectbox("Add this connection", Connected, key = "rem")
+            rem = st.selectbox(
+                "Remove this connection",
+                connected_options,
+                key="rem",
+                format_func=lambda x: "-- No change --" if x is None else x,
+            )
             submitted = st.form_submit_button("Submit")
-            
-            if len(Connected) == 0:
-                rem = None
-            if len(Available) == 1:
-                add2 = None
-            if len(Available) == 0:
-                add1 = None
-                add2 = None
                 
             if submitted:
                 
