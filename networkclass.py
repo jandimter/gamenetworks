@@ -5,8 +5,6 @@ from bokeh.io import output_notebook, show, save
 from bokeh.models import Range1d, Circle, ColumnDataSource, MultiLine, EdgesAndLinkedNodes, NodesAndLinkedEdges, LabelSet
 from bokeh.plotting import figure
 from bokeh.plotting import from_networkx
-from bokeh.palettes import Blues8, Reds8, Purples8, Oranges8, Viridis8, Spectral8
-from bokeh.transform import linear_cmap
 import numpy as np
 import os
 
@@ -173,13 +171,8 @@ class Networks_Game:
     
     def visualize(self):
         in_degree = dict(self.graph.in_degree())
-        max_indegree = max(in_degree.values()) if in_degree else 1
-        node_size = {
-            node: 16 + (22 * (in_degree.get(node, 0) / max_indegree if max_indegree else 0))
-            for node in self.graph.nodes()
-        }
-        nx.set_node_attributes(self.graph, name='adjusted_node_size', values=node_size)
-        nx.set_node_attributes(self.graph, name='node_color_metric', values=in_degree)
+        uniform_node_size = {node: 18 for node in self.graph.nodes()}
+        nx.set_node_attributes(self.graph, name='adjusted_node_size', values=uniform_node_size)
 
         node_highlight_color = 'blue'
         size_by_this_attribute = 'adjusted_node_size'
@@ -225,8 +218,7 @@ class Networks_Game:
 
         network_graph = from_networkx(self.graph, graph_layout, scale=1, center=(0, 0))
 
-        color_map = linear_cmap('node_color_metric', Viridis8, low=0, high=max_indegree if max_indegree else 1)
-        network_graph.node_renderer.glyph = Circle(size=size_by_this_attribute, fill_color=color_map, fill_alpha=0.95)
+        network_graph.node_renderer.glyph = Circle(size=size_by_this_attribute, fill_color="#3288bd", fill_alpha=0.95)
         network_graph.node_renderer.hover_glyph = Circle(size=size_by_this_attribute, fill_color=node_highlight_color, line_width=2)
         network_graph.node_renderer.selection_glyph = Circle(size=size_by_this_attribute, fill_color=node_highlight_color, line_width=2)
 
