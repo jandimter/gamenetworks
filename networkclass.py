@@ -1,6 +1,7 @@
 
 import math
 import networkx as nx
+import bokeh_compat  # noqa: F401
 from bokeh.io import output_notebook, show, save
 from bokeh.models import Range1d, Circle, ColumnDataSource, MultiLine, EdgesAndLinkedNodes, NodesAndLinkedEdges, LabelSet
 from bokeh.plotting import figure

@@ -8,6 +8,7 @@ Created on Fri Nov 26 10:28:14 2021
 
 import streamlit as st
 import networkclass as ntc
+import bokeh_compat  # noqa: F401
 import json
 import pickle as pk
 import os
