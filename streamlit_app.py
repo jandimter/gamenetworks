@@ -16,24 +16,18 @@ import re
 from io import BytesIO
 import zipfile
 import subprocess
-from bokeh.embed import components
+from bokeh.embed import file_html
+from bokeh.resources import CDN
+import streamlit.components.v1 as components_st
 
 
 
 
 def render_bokeh_chart(chart, key="bokeh_chart"):
-    """Renderiza un gráfico de Bokeh usando el componente streamlit-bokeh."""
-    try:
-        from streamlit_bokeh import streamlit_bokeh
-    except ImportError:
-        st.error(
-            "No se encontró la dependencia `streamlit-bokeh`. "
-            "Instálala con `pip install streamlit-bokeh`."
-        )
-        return
-
-    script, div = components(chart)
-    streamlit_bokeh(div=div, script=script, key=key)
+    """Renderiza un gráfico de Bokeh sin usar la API eliminada st.bokeh_chart."""
+    html = file_html(chart, CDN, title=key)
+    height = getattr(chart, "height", None) or getattr(chart, "plot_height", None) or 450
+    components_st.html(html, height=height + 32, scrolling=False)
 
 def load_users():
     with open("Users.txt") as f:
