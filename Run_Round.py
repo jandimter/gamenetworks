@@ -11,6 +11,40 @@ import json
 import os
 import networkx as nx
 
+
+
+def _student_from_payload(payload):
+    if isinstance(payload, ntc.Student):
+        return payload
+
+    if isinstance(payload, dict):
+        student_id = payload.get("id")
+        if not student_id:
+            raise ValueError("Missing student id in config payload")
+
+        student = ntc.Student(str(student_id))
+        student.add1 = payload.get("add1")
+        student.add2 = payload.get("add2")
+        student.rem = payload.get("rem")
+        student.decided = bool(payload.get("decided", any([student.add1, student.add2, student.rem])))
+        return student
+
+    raise ValueError(f"Unsupported payload type: {type(payload).__name__}")
+
+
+def load_student_config(user_file):
+    with open(user_file, "rb") as config_user_file:
+        raw = config_user_file.read()
+
+    try:
+        return _student_from_payload(pk.loads(raw))
+    except Exception:
+        try:
+            parsed = json.loads(raw.decode("utf-8"))
+            return _student_from_payload(parsed)
+        except Exception as exc:
+            raise ValueError(f"Invalid config format for {user_file}") from exc
+
 path = './'
 
 users_config = []
@@ -23,12 +57,10 @@ for r, d, f in os.walk(path):
 students = []
 
 for user_file in users_config:
-    
-    with open(user_file, 'rb') as config_user_file:
-     
-        # Step 3
-        students.append(pk.load(config_user_file))
-        config_user_file.close()
+    try:
+        students.append(load_student_config(user_file))
+    except ValueError as exc:
+        print(f"Skipping {user_file}: {exc}")
 
 
 with open('Users.txt') as f:

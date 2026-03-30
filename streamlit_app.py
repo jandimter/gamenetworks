@@ -16,7 +16,18 @@ import re
 from io import BytesIO
 import zipfile
 import subprocess
+from bokeh.embed import file_html
+from bokeh.resources import CDN
+import streamlit.components.v1 as components_st
 
+
+
+
+def render_bokeh_chart(chart, key="bokeh_chart"):
+    """Renderiza un gráfico de Bokeh sin usar la API eliminada st.bokeh_chart."""
+    html = file_html(chart, CDN, title=key)
+    height = getattr(chart, "height", None) or getattr(chart, "plot_height", None) or 450
+    components_st.html(html, height=height + 32, scrolling=False)
 
 def load_users():
     with open("Users.txt") as f:
@@ -502,7 +513,7 @@ def main():
             Changes_screen()
         Visualization()
         with st.container():
-            st.bokeh_chart(st.session_state.RANK_DONE, use_container_width=True)
+            render_bokeh_chart(st.session_state.RANK_DONE, key="rank_chart")
         Rankings_section()
         Network_downloads_section()
         
