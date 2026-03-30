@@ -1,11 +1,10 @@
 
+import math
 import networkx as nx
 from bokeh.io import output_notebook, show, save
 from bokeh.models import Range1d, Circle, ColumnDataSource, MultiLine, EdgesAndLinkedNodes, NodesAndLinkedEdges, LabelSet
 from bokeh.plotting import figure
 from bokeh.plotting import from_networkx
-from bokeh.palettes import Blues8, Reds8, Purples8, Oranges8, Viridis8, Spectral8
-from bokeh.transform import linear_cmap
 import numpy as np
 import os
 
@@ -171,12 +170,11 @@ class Networks_Game:
         return True
     
     def visualize(self):
-        number_to_adjust_by = 30
-        adjusted_node_size = dict([(node, degree + number_to_adjust_by) for node, degree in self.graph.degree()])
-        nx.set_node_attributes(self.graph, name='adjusted_node_size', values=adjusted_node_size)
+        in_degree = dict(self.graph.in_degree())
+        uniform_node_size = {node: 18 for node in self.graph.nodes()}
+        nx.set_node_attributes(self.graph, name='adjusted_node_size', values=uniform_node_size)
 
         node_highlight_color = 'blue'
-        edge_highlight_color = 'red'
         size_by_this_attribute = 'adjusted_node_size'
         title = 'Game of Networks Round ' + str(self.round)
 
@@ -193,37 +191,82 @@ class Networks_Game:
         plot = figure(tooltips=HOVER_TOOLTIPS,
                     tools="pan,wheel_zoom,save,reset",
                     active_scroll='wheel_zoom',
-                    x_range=Range1d(-10.1, 10.1),
-                    y_range=Range1d(-10.1, 10.1),
                     title=title)
 
-        network_graph = from_networkx(self.graph, nx.spring_layout, scale=10, center=(0, 0))
+        components = [sorted(comp) for comp in nx.weakly_connected_components(self.graph)]
+        components.sort(key=len, reverse=True)
 
-        network_graph.node_renderer.glyph = Circle(size=size_by_this_attribute, fill_color="#3288bd")
+        graph_layout = {}
+        if components:
+            spacing_x = 6.5
+            spacing_y = 5.5
+            cols = max(1, math.ceil(math.sqrt(len(components))))
+            for idx, comp in enumerate(components):
+                subgraph = self.graph.subgraph(comp)
+                local_layout = nx.spring_layout(
+                    subgraph,
+                    k=max(0.6, 2.0 / math.sqrt(max(1, len(comp)))),
+                    seed=42,
+                    iterations=80,
+                )
+                row = idx // cols
+                col = idx % cols
+                offset_x = col * spacing_x
+                offset_y = -row * spacing_y
+                for node, (x, y) in local_layout.items():
+                    graph_layout[node] = (x + offset_x, y + offset_y)
+
+        network_graph = from_networkx(self.graph, graph_layout, scale=1, center=(0, 0))
+
+        network_graph.node_renderer.glyph = Circle(size=size_by_this_attribute, fill_color="#3288bd", fill_alpha=0.95)
         network_graph.node_renderer.hover_glyph = Circle(size=size_by_this_attribute, fill_color=node_highlight_color, line_width=2)
         network_graph.node_renderer.selection_glyph = Circle(size=size_by_this_attribute, fill_color=node_highlight_color, line_width=2)
 
-        network_graph.edge_renderer.glyph = MultiLine(line_alpha=0.1, line_width=1)
+        network_graph.edge_renderer.glyph = MultiLine(line_alpha=0.25, line_width=1.2, line_color="#4d4d4d")
 
         network_graph.selection_policy = NodesAndLinkedEdges()
         network_graph.inspection_policy = NodesAndLinkedEdges()
 
         plot.renderers.append(network_graph)
 
-        # Añadir etiquetas (último para que queden encima)
-        x, y = zip(*network_graph.layout_provider.graph_layout.values())
+        if graph_layout:
+            x_vals = [x for x, _ in graph_layout.values()]
+            y_vals = [y for _, y in graph_layout.values()]
+            x_pad = 1.2
+            y_pad = 1.2
+            plot.x_range = Range1d(min(x_vals) - x_pad, max(x_vals) + x_pad)
+            plot.y_range = Range1d(min(y_vals) - y_pad, max(y_vals) + y_pad)
+
+        plot.xaxis.visible = False
+        plot.yaxis.visible = False
+        plot.xgrid.visible = False
+        plot.ygrid.visible = False
+        plot.outline_line_alpha = 0.35
+
         node_labels = list(self.graph.nodes())
-        source = ColumnDataSource({'x': x, 'y': y, 'name': [self.aliases.get(node_labels[i], node_labels[i]) for i in range(len(x))]})
+        rank_by_indegree = sorted(node_labels, key=lambda node: (-in_degree.get(node, 0), node))
+        highlighted_nodes = set(rank_by_indegree[:max(8, len(node_labels) // 3)])
+        label_nodes = [node for node in node_labels if node in highlighted_nodes]
+
+        x = [network_graph.layout_provider.graph_layout[node][0] for node in label_nodes]
+        y = [network_graph.layout_provider.graph_layout[node][1] for node in label_nodes]
+        source = ColumnDataSource(
+            {
+                'x': x,
+                'y': y,
+                'name': [self.aliases.get(node, node) for node in label_nodes],
+            }
+        )
         labels = LabelSet(x='x', y='y', text='name', source=source, background_fill_color='white',
-                        text_font_size='10px', background_fill_alpha=0.9, render_mode='canvas')
+                        text_font_size='10px', background_fill_alpha=0.9, render_mode='canvas', y_offset=6)
         plot.renderers.append(labels)
 
-        # Flechas pequeñas y discretas, ahora debajo de etiquetas
+        # Flechas pequeñas y discretas
         from bokeh.models import Arrow, NormalHead
 
         for start_node, end_node in self.graph.edges():
             plot.add_layout(Arrow(end=NormalHead(size=6, fill_color="#555555"),
-                                line_alpha=0.5, line_width=1,
+                                line_alpha=0.45, line_width=1,
                                 x_start=network_graph.layout_provider.graph_layout[start_node][0],
                                 y_start=network_graph.layout_provider.graph_layout[start_node][1],
                                 x_end=network_graph.layout_provider.graph_layout[end_node][0],
