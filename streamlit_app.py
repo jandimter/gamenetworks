@@ -15,6 +15,7 @@ import glob
 import re
 from io import BytesIO
 import zipfile
+import subprocess
 
 
 def load_users():
@@ -61,7 +62,6 @@ def build_rankings(game):
                 "User": node,
                 "Alias": game.aliases.get(node, node),
                 "Indegree": attrs.get("indegree", 0),
-                "Outdegree": attrs.get("outdegree", 0),
                 "Clustering": round(attrs.get("clustering", 0), 4),
                 "Betweenness": round(attrs.get("BTC", 0), 4),
             }
@@ -69,7 +69,6 @@ def build_rankings(game):
 
     metric_configs = [
         ("Indegree", True),
-        ("Outdegree", True),
         ("Clustering", True),
         ("Betweenness", True),
     ]
@@ -77,15 +76,68 @@ def build_rankings(game):
     per_metric_rank = {entry[0]: {} for entry in metric_configs}
 
     for metric, descending in metric_configs:
-        ordered = sorted(nodes_stats, key=lambda x: x[metric], reverse=descending)
+        ordered = sorted(nodes_stats, key=lambda x: (-x[metric], x["User"]) if descending else (x[metric], x["User"]))
         for idx, item in enumerate(ordered, start=1):
             per_metric_rank[metric][item["User"]] = idx
 
-    for item in nodes_stats:
-        rank_sum = sum(per_metric_rank[metric][item["User"]] for metric, _ in metric_configs)
-        item["Rank Score"] = rank_sum
+    previous_round_rank = None
+    previous_round = game.round - 1
+    previous_round_file = f"Graph_Round{previous_round}.txt"
 
-    return sorted(nodes_stats, key=lambda x: (x["Rank Score"], x["User"]))
+    if previous_round >= 0 and os.path.exists(previous_round_file):
+        prev_game = ntc.Networks_Game(game.students, previous_round_file, previous_round, aliases=game.aliases)
+        prev_game.compute_ranking()
+
+        prev_nodes_stats = []
+        for node in prev_game.graph.nodes:
+            prev_attrs = prev_game.graph.nodes[node]
+            prev_nodes_stats.append(
+                {
+                    "User": node,
+                    "Indegree": prev_attrs.get("indegree", 0),
+                    "Clustering": round(prev_attrs.get("clustering", 0), 4),
+                    "Betweenness": round(prev_attrs.get("BTC", 0), 4),
+                }
+            )
+
+        previous_round_rank = {entry[0]: {} for entry in metric_configs}
+        for metric, descending in metric_configs:
+            ordered_prev = sorted(
+                prev_nodes_stats,
+                key=lambda x: (-x[metric], x["User"]) if descending else (x[metric], x["User"]),
+            )
+            for idx, item in enumerate(ordered_prev, start=1):
+                previous_round_rank[metric][item["User"]] = idx
+
+    rankings = []
+    for item in nodes_stats:
+        row = {
+            "Alias": item["Alias"],
+            "User": item["User"],
+            "Indegree": item["Indegree"],
+            "Clustering": item["Clustering"],
+            "Betweenness": item["Betweenness"],
+            "Rank Indegree": per_metric_rank["Indegree"][item["User"]],
+            "Rank Clustering": per_metric_rank["Clustering"][item["User"]],
+            "Rank Betweenness": per_metric_rank["Betweenness"][item["User"]],
+        }
+
+        for metric_name in ["Indegree", "Clustering", "Betweenness"]:
+            delta_key = f"Δ {metric_name}"
+            if previous_round_rank is None or item["User"] not in previous_round_rank[metric_name]:
+                row[delta_key] = "—"
+            else:
+                delta = previous_round_rank[metric_name][item["User"]] - per_metric_rank[metric_name][item["User"]]
+                if delta > 0:
+                    row[delta_key] = f"↑ {delta}"
+                elif delta < 0:
+                    row[delta_key] = f"↓ {abs(delta)}"
+                else:
+                    row[delta_key] = "= 0"
+
+        rankings.append(row)
+
+    return sorted(rankings, key=lambda x: (-x["Indegree"], x["User"]))
 
 def check_identity(ID, PASSWORD):
     admins = load_admins()
@@ -186,6 +238,31 @@ def Admin_dashboard():
         )
 
     st.dataframe(status_rows, use_container_width=True, hide_index=True)
+
+    st.subheader("Control de ronda")
+    st.caption("Ejecuta el cierre de ronda y genera el siguiente archivo de red.")
+    if st.button("Run round", key="run_round_admin"):
+        with st.spinner("Ejecutando cierre de ronda..."):
+            result = subprocess.run(
+                ["python", "Run_Round.py"],
+                capture_output=True,
+                text=True,
+            )
+        if result.returncode == 0:
+            st.success("Ronda ejecutada correctamente.")
+            if result.stdout.strip():
+                st.code(result.stdout.strip())
+            with open("Metadata.txt") as f:
+                metadata = json.loads(f.read())
+            st.session_state.Game = Init_Game(list(users.keys()), Round=metadata["Round"])
+            st.session_state.pop("RANK_DONE", None)
+            st.rerun()
+        else:
+            st.error("No se pudo ejecutar la ronda.")
+            if result.stderr.strip():
+                st.code(result.stderr.strip())
+            elif result.stdout.strip():
+                st.code(result.stdout.strip())
                     
 def Changes_screen():
     Round = st.session_state["Game"].round
@@ -299,25 +376,25 @@ def Visualization():
 
 def Rankings_section():
     st.subheader("Ranking de usuarios por stats")
-    st.caption("Menor 'Rank Score' indica mejor posición combinada entre las métricas.")
+    st.caption("Ordenado por indegree. Cada stat incluye su ranking y variación respecto de la ronda anterior.")
 
     rankings = build_rankings(st.session_state.Game)
-
-    for pos, item in enumerate(rankings, start=1):
-        item["Posición"] = pos
 
     st.dataframe(
         rankings,
         use_container_width=True,
         hide_index=True,
         column_order=[
-            "Posición",
             "Alias",
-            "Rank Score",
             "Indegree",
-            "Outdegree",
+            "Rank Indegree",
+            "Δ Indegree",
             "Clustering",
+            "Rank Clustering",
+            "Δ Clustering",
             "Betweenness",
+            "Rank Betweenness",
+            "Δ Betweenness",
         ],
     )
 
@@ -330,13 +407,10 @@ def round_from_filename(path):
 
 
 def Network_downloads_section():
-    st.subheader("Descarga de redes por ronda")
-    st.caption(
-        "Archivos en formato edge-list compatible con NetworkX "
-        "(nx.read_edgelist(..., create_using=nx.DiGraph()))."
-    )
+    st.subheader("Descarga de archivos de red")
+    st.caption("Exporta las rondas para análisis y respaldo de la evolución del juego.")
 
-    round_files = sorted(glob.glob("Graph_Round*.txt"), key=round_from_filename)
+    round_files = sorted(glob.glob("Graph_Round*.txt"), key=round_from_filename, reverse=True)
 
     if not round_files:
         st.info("No hay archivos de rondas disponibles para descargar.")
@@ -348,24 +422,36 @@ def Network_downloads_section():
             zipf.write(file_path, arcname=os.path.basename(file_path))
     zip_buffer.seek(0)
 
-    st.download_button(
-        label="Descargar todas las rondas (.zip)",
-        data=zip_buffer.getvalue(),
-        file_name="GameNetworks_Rounds.zip",
-        mime="application/zip",
-        key="download_all_rounds",
-    )
+    top_left, top_right = st.columns([2, 1])
+    with top_left:
+        st.markdown(f"**{len(round_files)} archivos disponibles**")
+    with top_right:
+        st.download_button(
+            label="⬇️ Descargar todo (.zip)",
+            data=zip_buffer.getvalue(),
+            file_name="GameNetworks_Rounds.zip",
+            mime="application/zip",
+            key="download_all_rounds",
+            use_container_width=True,
+        )
 
+    st.markdown("#### Descarga por ronda")
     for file_path in round_files:
+        round_num = round_from_filename(file_path)
         with open(file_path, "rb") as f:
             content = f.read()
-        round_num = round_from_filename(file_path)
-        st.download_button(
-            label=f"Descargar ronda {round_num}",
+
+        file_size_kb = max(len(content) / 1024, 0.1)
+        c1, c2, c3 = st.columns([2, 1, 1])
+        c1.markdown(f"**Ronda {round_num}**")
+        c2.caption(f"{file_size_kb:.1f} KB")
+        c3.download_button(
+            label="Descargar",
             data=content,
             file_name=os.path.basename(file_path),
             mime="text/plain",
             key=f"download_round_{round_num}",
+            use_container_width=True,
         )
     
 
