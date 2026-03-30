@@ -16,7 +16,24 @@ import re
 from io import BytesIO
 import zipfile
 import subprocess
+from bokeh.embed import components
 
+
+
+
+def render_bokeh_chart(chart, key="bokeh_chart"):
+    """Renderiza un gráfico de Bokeh usando el componente streamlit-bokeh."""
+    try:
+        from streamlit_bokeh import streamlit_bokeh
+    except ImportError:
+        st.error(
+            "No se encontró la dependencia `streamlit-bokeh`. "
+            "Instálala con `pip install streamlit-bokeh`."
+        )
+        return
+
+    script, div = components(chart)
+    streamlit_bokeh(div=div, script=script, key=key)
 
 def load_users():
     with open("Users.txt") as f:
@@ -502,7 +519,7 @@ def main():
             Changes_screen()
         Visualization()
         with st.container():
-            st.bokeh_chart(st.session_state.RANK_DONE, use_container_width=True)
+            render_bokeh_chart(st.session_state.RANK_DONE, key="rank_chart")
         Rankings_section()
         Network_downloads_section()
         
