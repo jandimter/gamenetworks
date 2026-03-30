@@ -54,6 +54,8 @@ def load_aliases(user_ids):
 
 
 def build_rankings(game):
+    has_edges_current_round = game.graph.number_of_edges() > 0
+
     nodes_stats = []
     for node in game.graph.nodes:
         attrs = game.graph.nodes[node]
@@ -75,10 +77,11 @@ def build_rankings(game):
 
     per_metric_rank = {entry[0]: {} for entry in metric_configs}
 
-    for metric, descending in metric_configs:
-        ordered = sorted(nodes_stats, key=lambda x: (-x[metric], x["User"]) if descending else (x[metric], x["User"]))
-        for idx, item in enumerate(ordered, start=1):
-            per_metric_rank[metric][item["User"]] = idx
+    if has_edges_current_round:
+        for metric, descending in metric_configs:
+            ordered = sorted(nodes_stats, key=lambda x: (-x[metric], x["User"]) if descending else (x[metric], x["User"]))
+            for idx, item in enumerate(ordered, start=1):
+                per_metric_rank[metric][item["User"]] = idx
 
     previous_round_rank = None
     previous_round = game.round - 1
@@ -86,28 +89,31 @@ def build_rankings(game):
 
     if previous_round >= 0 and os.path.exists(previous_round_file):
         prev_game = ntc.Networks_Game(game.students, previous_round_file, previous_round, aliases=game.aliases)
-        prev_game.compute_ranking()
+        has_edges_previous_round = prev_game.graph.number_of_edges() > 0
 
-        prev_nodes_stats = []
-        for node in prev_game.graph.nodes:
-            prev_attrs = prev_game.graph.nodes[node]
-            prev_nodes_stats.append(
-                {
-                    "User": node,
-                    "Indegree": prev_attrs.get("indegree", 0),
-                    "Clustering": round(prev_attrs.get("clustering", 0), 4),
-                    "Betweenness": round(prev_attrs.get("BTC", 0), 4),
-                }
-            )
+        if has_edges_previous_round:
+            prev_game.compute_ranking()
 
-        previous_round_rank = {entry[0]: {} for entry in metric_configs}
-        for metric, descending in metric_configs:
-            ordered_prev = sorted(
-                prev_nodes_stats,
-                key=lambda x: (-x[metric], x["User"]) if descending else (x[metric], x["User"]),
-            )
-            for idx, item in enumerate(ordered_prev, start=1):
-                previous_round_rank[metric][item["User"]] = idx
+            prev_nodes_stats = []
+            for node in prev_game.graph.nodes:
+                prev_attrs = prev_game.graph.nodes[node]
+                prev_nodes_stats.append(
+                    {
+                        "User": node,
+                        "Indegree": prev_attrs.get("indegree", 0),
+                        "Clustering": round(prev_attrs.get("clustering", 0), 4),
+                        "Betweenness": round(prev_attrs.get("BTC", 0), 4),
+                    }
+                )
+
+            previous_round_rank = {entry[0]: {} for entry in metric_configs}
+            for metric, descending in metric_configs:
+                ordered_prev = sorted(
+                    prev_nodes_stats,
+                    key=lambda x: (-x[metric], x["User"]) if descending else (x[metric], x["User"]),
+                )
+                for idx, item in enumerate(ordered_prev, start=1):
+                    previous_round_rank[metric][item["User"]] = idx
 
     rankings = []
     for item in nodes_stats:
@@ -117,14 +123,19 @@ def build_rankings(game):
             "Indegree": item["Indegree"],
             "Clustering": item["Clustering"],
             "Betweenness": item["Betweenness"],
-            "Rank Indegree": per_metric_rank["Indegree"][item["User"]],
-            "Rank Clustering": per_metric_rank["Clustering"][item["User"]],
-            "Rank Betweenness": per_metric_rank["Betweenness"][item["User"]],
+            "Rank Indegree": per_metric_rank["Indegree"].get(item["User"], "—"),
+            "Rank Clustering": per_metric_rank["Clustering"].get(item["User"], "—"),
+            "Rank Betweenness": per_metric_rank["Betweenness"].get(item["User"], "—"),
         }
 
         for metric_name in ["Indegree", "Clustering", "Betweenness"]:
             delta_key = f"Δ {metric_name}"
-            if previous_round_rank is None or item["User"] not in previous_round_rank[metric_name]:
+            if (
+                not has_edges_current_round
+                or previous_round_rank is None
+                or item["User"] not in previous_round_rank[metric_name]
+                or item["User"] not in per_metric_rank[metric_name]
+            ):
                 row[delta_key] = "—"
             else:
                 delta = previous_round_rank[metric_name][item["User"]] - per_metric_rank[metric_name][item["User"]]
