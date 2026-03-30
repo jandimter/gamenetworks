@@ -206,8 +206,8 @@ class Networks_Game:
         ordered_nodes = sorted(unit_ranking_score.items(), key=lambda x: (-x[1], x[0]))
         unit_ranking_position = {node: idx for idx, (node, _) in enumerate(ordered_nodes, start=1)}
 
-        nx.set_node_attributes(self.graph, name='unit_ranking_score', values=unit_ranking_score)
-        nx.set_node_attributes(self.graph, name='unit_ranking_position', values=unit_ranking_position)
+        nx.set_node_attributes(self.graph, name='ranking_score', values=unit_ranking_score)
+        nx.set_node_attributes(self.graph, name='ranking_position', values=unit_ranking_position)
         return unit_ranking_score, unit_ranking_position
     
     def visualize(self, is_admin=False):
@@ -224,8 +224,8 @@ class Networks_Game:
             HOVER_TOOLTIPS = [
                 ("User ID", "@index"),
                 ("Alias", "@alias"),
-                ("Ranking unitario (posición)", "@unit_ranking_position"),
-                ("Ranking unitario (score)", "@unit_ranking_score"),
+                ("Ranking", "@ranking_position"),
+                ("Puntaje ranking", "@ranking_score"),
                 ("Indegree", "@indegree"),
                 ("Outdegree", "@outdegree"),
                 ("Clustering coefficient", "@clustering"),
@@ -234,8 +234,7 @@ class Networks_Game:
         else:
             HOVER_TOOLTIPS = [
                 ("Alias", "@alias"),
-                ("Ranking unitario (posición)", "@unit_ranking_position"),
-                ("Ranking unitario (score)", "@unit_ranking_score"),
+                ("Ranking", "@ranking_position"),
             ]
 
 

@@ -165,8 +165,8 @@ def build_rankings(game):
         row = {
             "Alias": item["Alias"],
             "User": item["User"],
-            "Ranking unitario": unit_score[item["User"]],
-            "Posición unitario": unit_rank[item["User"]],
+            "Puntaje ranking": unit_score[item["User"]],
+            "Ranking": unit_rank[item["User"]],
             "Indegree": item["Indegree"],
             "Clustering": item["Clustering"],
             "Betweenness": item["Betweenness"],
@@ -194,19 +194,19 @@ def build_rankings(game):
                     row[delta_key] = "= 0"
 
         if previous_unit_rank is None or item["User"] not in previous_unit_rank:
-            row["Δ unitario"] = "—"
+            row["Δ Ranking"] = "—"
         else:
             delta_unit = previous_unit_rank[item["User"]] - unit_rank[item["User"]]
             if delta_unit > 0:
-                row["Δ unitario"] = f"↑ {delta_unit}"
+                row["Δ Ranking"] = f"↑ {delta_unit}"
             elif delta_unit < 0:
-                row["Δ unitario"] = f"↓ {abs(delta_unit)}"
+                row["Δ Ranking"] = f"↓ {abs(delta_unit)}"
             else:
-                row["Δ unitario"] = "= 0"
+                row["Δ Ranking"] = "= 0"
 
         rankings.append(row)
 
-    return sorted(rankings, key=lambda x: (x["Posición unitario"], x["User"]))
+    return sorted(rankings, key=lambda x: (x["Ranking"], x["User"]))
 
 def check_identity(ID, PASSWORD):
     admins = load_admins()
@@ -461,20 +461,23 @@ def Visualization():
 
 def Rankings_section():
     st.subheader("Ranking de usuarios")
+    st.caption(
+        "El ranking se arma promediando la versión min-max de indegree, clustering y betweenness en la ronda actual."
+    )
 
     rankings = build_rankings(st.session_state.Game)
 
     if st.session_state.IsAdmin:
-        st.caption("Vista completa para administración, incluyendo métricas base y ranking unitario.")
+        st.caption("Vista completa para administración, incluyendo métricas base y el detalle del ranking.")
         st.dataframe(
             rankings,
             use_container_width=True,
             hide_index=True,
             column_order=[
                 "Alias",
-                "Posición unitario",
-                "Ranking unitario",
-                "Δ unitario",
+                "Ranking",
+                "Puntaje ranking",
+                "Δ Ranking",
                 "Indegree",
                 "Rank Indegree",
                 "Δ Indegree",
@@ -487,16 +490,15 @@ def Rankings_section():
             ],
         )
     else:
-        st.caption("Vista de usuario: se muestra únicamente el ranking unitario.")
+        st.caption("Vista de usuario: solo se muestra el ranking y su variación.")
         st.dataframe(
             rankings,
             use_container_width=True,
             hide_index=True,
             column_order=[
                 "Alias",
-                "Posición unitario",
-                "Ranking unitario",
-                "Δ unitario",
+                "Ranking",
+                "Δ Ranking",
             ],
         )
 
