@@ -23,6 +23,10 @@ Cada participante propone cambios en sus conexiones, y al cerrar la ronda el sis
   Script de administración para cerrar una ronda, aplicar todos los cambios pendientes, guardar nuevo grafo y actualizar metadatos.
 - `Users.txt`  
   Diccionario JSON con usuarios y contraseñas.
+- `Admins.txt`  
+  Diccionario JSON de acceso administrativo para monitorear el avance sin participar en la dinámica.
+- `Aliases.txt`  
+  Diccionario JSON opcional para mostrar alias por usuario en la UI (si no existe, se usa el ID como alias).
 - `Metadata.txt`  
   Estado global del juego (ej. ronda actual).
 - `Graph_Round<N>.txt`  
@@ -94,6 +98,18 @@ Ejemplo:
 }
 ```
 
+### `Admins.txt`
+JSON con pares `"admin_id": "password"`.
+Estos usuarios pueden iniciar sesión para revisar avance (ronda, envíos y pendientes) sin enviar cambios al juego.
+
+Ejemplo:
+
+```json
+{
+  "admin": "admin"
+}
+```
+
 ### `Metadata.txt`
 JSON con la ronda actual.
 
@@ -102,6 +118,19 @@ Ejemplo:
 ```json
 {
   "Round": 2
+}
+```
+
+### `Aliases.txt` (opcional)
+JSON con pares `"usuario": "alias_mostrado"`.
+Si un usuario no tiene alias (o el archivo no existe), se mostrará su ID original.
+
+Ejemplo:
+
+```json
+{
+  "admin1": "Grupo A",
+  "admin2": "Grupo B"
 }
 ```
 

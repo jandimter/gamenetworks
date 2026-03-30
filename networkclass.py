@@ -12,9 +12,15 @@ import os
 
 class Networks_Game:
     
-    def __init__(self, students, Network = "Graph.txt", Round = 0):
+    def __init__(self, students, Network = "Graph.txt", Round = 0, aliases = None):
         self.round = Round
         self.students = students
+        self.aliases = {student: student for student in students}
+        if aliases is not None:
+            for student in students:
+                alias = aliases.get(student, student)
+                if isinstance(alias, str) and alias.strip():
+                    self.aliases[student] = alias.strip()
         self.pending_changes = {}
         self.game_size = len(students)
         for student in students:
@@ -30,6 +36,7 @@ class Networks_Game:
             self.graph.add_edges_from(graph_from_file.edges())  # Añadir explícitamente las aristas del archivo
 
         self.graph.add_nodes_from(self.students)  # Esto asegura la existencia de nodos siempre
+        nx.set_node_attributes(self.graph, name='alias', values=self.aliases)
             
         
         
@@ -174,7 +181,8 @@ class Networks_Game:
         title = 'Game of Networks Round ' + str(self.round)
 
         HOVER_TOOLTIPS = [
-            ("Student ID", "@index"),
+            ("User ID", "@index"),
+            ("Alias", "@alias"),
             ("Indegree", "@indegree"),
             ("Outdegree", "@outdegree"),
             ("Clustering coefficient", "@clustering"),
@@ -205,7 +213,7 @@ class Networks_Game:
         # Añadir etiquetas (último para que queden encima)
         x, y = zip(*network_graph.layout_provider.graph_layout.values())
         node_labels = list(self.graph.nodes())
-        source = ColumnDataSource({'x': x, 'y': y, 'name': [node_labels[i] for i in range(len(x))]})
+        source = ColumnDataSource({'x': x, 'y': y, 'name': [self.aliases.get(node_labels[i], node_labels[i]) for i in range(len(x))]})
         labels = LabelSet(x='x', y='y', text='name', source=source, background_fill_color='white',
                         text_font_size='10px', background_fill_alpha=0.9, render_mode='canvas')
         plot.renderers.append(labels)
