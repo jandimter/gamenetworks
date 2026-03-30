@@ -184,7 +184,6 @@ class Networks_Game:
             ("User ID", "@index"),
             ("Alias", "@alias"),
             ("Indegree", "@indegree"),
-            ("Outdegree", "@outdegree"),
             ("Clustering coefficient", "@clustering"),
             ("Betwenness Centrality", "@BTC"),
         ]
