@@ -268,32 +268,44 @@ def Changes_screen():
     Round = st.session_state["Game"].round
     st.title("Game of Networks Round: " + str(Round))
     alias_map = st.session_state.Game.aliases
+
+    def alias_label(user_id):
+        alias = alias_map.get(user_id, user_id)
+        if alias != user_id and list(alias_map.values()).count(alias) > 1:
+            return f"{alias} ({user_id})"
+        return alias
+
+    def to_alias_options(user_ids):
+        return [alias_label(user_id) for user_id in user_ids]
+
+    def alias_to_user_map(user_ids):
+        return {alias_label(user_id): user_id for user_id in user_ids}
     
     if Round == 0:
         with st.form("NewConnections"):
             Available = st.session_state.Game.unconnectedOF(st.session_state.User.id)
-            available_options = [None] + Available
+            available_aliases = ["-- No change --"] + to_alias_options(Available)
+            available_alias_lookup = alias_to_user_map(Available)
             "Choose 2 connections to add"
             "Connection 1"
             add1 = st.selectbox(
                 "Add this connection",
-                available_options,
+                available_aliases,
                 key="add1",
-
-                format_func=lambda x: "-- No change --" if x is None else alias_map.get(x, x),
             )
             "Connection 2"
             add2 = st.selectbox(
                 "Add this connection",
-                available_options,
+                available_aliases,
                 key="add2",
-                format_func=lambda x: "-- No change --" if x is None else alias_map.get(x, x),
             )
             submitted = st.form_submit_button("Submit")
             
             if submitted:
+                add1_user = available_alias_lookup.get(add1)
+                add2_user = available_alias_lookup.get(add2)
                 
-                SUBMISSION, MESSAGE = st.session_state.Game.new_change(st.session_state.User, add1, add2)
+                SUBMISSION, MESSAGE = st.session_state.Game.new_change(st.session_state.User, add1_user, add2_user)
                 
                 if SUBMISSION:
                     st.success(MESSAGE)
@@ -312,35 +324,39 @@ def Changes_screen():
         with st.form("NewConnections"):
             Available = st.session_state.Game.unconnectedOF(st.session_state.User.id)
             Connected = st.session_state.Game.connectionsOF(st.session_state.User.id)
-            available_options = [None] + Available
-            connected_options = [None] + Connected
+            available_aliases = ["-- No change --"] + to_alias_options(Available)
+            connected_aliases = ["-- No change --"] + to_alias_options(Connected)
+            available_alias_lookup = alias_to_user_map(Available)
+            connected_alias_lookup = alias_to_user_map(Connected)
             "Choose 2 connections to add"
             "Connection 1"
             add1 = st.selectbox(
                 "Add this connection",
-                available_options,
+                available_aliases,
                 key="add1",
-                format_func=lambda x: "-- No change --" if x is None else alias_map.get(x, x),
             )
             "Connection 2"
             add2 = st.selectbox(
                 "Add this connection",
-                available_options,
+                available_aliases,
                 key="add2",
-                format_func=lambda x: "-- No change --" if x is None else alias_map.get(x, x),
             )
             "Remove Connection"
             rem = st.selectbox(
                 "Remove this connection",
-                connected_options,
+                connected_aliases,
                 key="rem",
-                format_func=lambda x: "-- No change --" if x is None else alias_map.get(x, x),
             )
             submitted = st.form_submit_button("Submit")
                 
             if submitted:
+                add1_user = available_alias_lookup.get(add1)
+                add2_user = available_alias_lookup.get(add2)
+                rem_user = connected_alias_lookup.get(rem)
                 
-                SUBMISSION, MESSAGE = st.session_state.Game.new_change(st.session_state.User, add1, add2, rem)
+                SUBMISSION, MESSAGE = st.session_state.Game.new_change(
+                    st.session_state.User, add1_user, add2_user, rem_user
+                )
                 
                 if SUBMISSION:
                     st.success(MESSAGE)
