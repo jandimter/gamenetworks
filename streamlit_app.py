@@ -474,7 +474,6 @@ def Rankings_section():
     rankings = build_rankings(st.session_state.Game)
 
     if st.session_state.IsAdmin:
-        st.caption("Vista completa para administración, incluyendo métricas base y el detalle del ranking.")
         st.dataframe(
             rankings,
             use_container_width=True,
