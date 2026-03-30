@@ -353,8 +353,8 @@ def Changes_screen():
     if Round == 0:
         with st.form("NewConnections"):
             Available = st.session_state.Game.unconnectedOF(st.session_state.User.id)
-            available_aliases = ["-- No change --"] + to_alias_options(Available)
             available_alias_lookup = alias_to_user_map(Available)
+            available_aliases = ["-- No change --"] + to_alias_options(Available)
             "Choose 2 connections to add"
             "Connection 1"
             add1 = st.selectbox(
@@ -362,10 +362,13 @@ def Changes_screen():
                 available_aliases,
                 key="add1",
             )
+            available_for_add2 = [
+                alias for alias in available_aliases if alias == "-- No change --" or alias != add1
+            ]
             "Connection 2"
             add2 = st.selectbox(
                 "Add this connection",
-                available_aliases,
+                available_for_add2,
                 key="add2",
             )
             submitted = st.form_submit_button("Submit")
@@ -393,10 +396,10 @@ def Changes_screen():
         with st.form("NewConnections"):
             Available = st.session_state.Game.unconnectedOF(st.session_state.User.id)
             Connected = st.session_state.Game.connectionsOF(st.session_state.User.id)
-            available_aliases = ["-- No change --"] + to_alias_options(Available)
-            connected_aliases = ["-- No change --"] + to_alias_options(Connected)
             available_alias_lookup = alias_to_user_map(Available)
             connected_alias_lookup = alias_to_user_map(Connected)
+            available_aliases = ["-- No change --"] + to_alias_options(Available)
+            connected_aliases = ["-- No change --"] + to_alias_options(Connected)
             "Choose 2 connections to add"
             "Connection 1"
             add1 = st.selectbox(
@@ -404,10 +407,13 @@ def Changes_screen():
                 available_aliases,
                 key="add1",
             )
+            available_for_add2 = [
+                alias for alias in available_aliases if alias == "-- No change --" or alias != add1
+            ]
             "Connection 2"
             add2 = st.selectbox(
                 "Add this connection",
-                available_aliases,
+                available_for_add2,
                 key="add2",
             )
             "Remove Connection"
@@ -490,7 +496,6 @@ def Rankings_section():
             ],
         )
     else:
-        st.caption("Vista de usuario: solo se muestra el ranking y su variación.")
         st.dataframe(
             rankings,
             use_container_width=True,

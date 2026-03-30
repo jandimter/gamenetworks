@@ -146,9 +146,11 @@ class Networks_Game:
         return list(self.graph.neighbors(studentID))
     
     def unconnectedOF(self, studentID):
-        connected = self.connectionsOF(studentID)
-        connected.append(studentID)
-        return [x for x in self.students if (x not in connected)]
+        outgoing_connections = set(self.graph.successors(studentID))
+        incoming_connections = set(self.graph.predecessors(studentID))
+        connected_any_direction = outgoing_connections.union(incoming_connections)
+        connected_any_direction.add(studentID)
+        return [x for x in self.students if x not in connected_any_direction]
     
     def save_network(self, path):
         
