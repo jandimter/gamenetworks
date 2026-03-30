@@ -81,11 +81,7 @@ def build_rankings(game):
             }
         )
 
-    metric_configs = [
-        ("Indegree", True),
-        ("Clustering", True),
-        ("Betweenness", True),
-    ]
+    metric_configs = [("Indegree", True), ("Clustering", True), ("Betweenness", True)]
 
     per_metric_rank = {entry[0]: {} for entry in metric_configs}
 
@@ -127,11 +123,50 @@ def build_rankings(game):
                 for idx, item in enumerate(ordered_prev, start=1):
                     previous_round_rank[metric][item["User"]] = idx
 
+    def minmax(values):
+        if not values:
+            return {}
+        min_value = min(values.values())
+        max_value = max(values.values())
+        denominator = max_value - min_value
+        if denominator == 0:
+            return {user_id: 0.0 for user_id in values}
+        return {user_id: (value - min_value) / denominator for user_id, value in values.items()}
+
+    indegree_values = {item["User"]: item["Indegree"] for item in nodes_stats}
+    clustering_values = {item["User"]: item["Clustering"] for item in nodes_stats}
+    betweenness_values = {item["User"]: item["Betweenness"] for item in nodes_stats}
+
+    indegree_minmax = minmax(indegree_values)
+    clustering_minmax = minmax(clustering_values)
+    betweenness_minmax = minmax(betweenness_values)
+
+    unit_score = {}
+    for item in nodes_stats:
+        user_id = item["User"]
+        unit_score[user_id] = round(
+            (indegree_minmax[user_id] + clustering_minmax[user_id] + betweenness_minmax[user_id]) / 3, 4
+        )
+
+    unit_rank = {}
+    ordered_unit_rank = sorted(unit_score.items(), key=lambda x: (-x[1], x[0]))
+    for idx, (user_id, _) in enumerate(ordered_unit_rank, start=1):
+        unit_rank[user_id] = idx
+
+    previous_unit_rank = None
+    if previous_round >= 0 and os.path.exists(previous_round_file):
+        prev_game = ntc.Networks_Game(game.students, previous_round_file, previous_round, aliases=game.aliases)
+        if prev_game.graph.number_of_edges() > 0:
+            prev_game.compute_ranking()
+            _, previous_unit_rank = prev_game.compute_unit_ranking()
+
     rankings = []
     for item in nodes_stats:
         row = {
             "Alias": item["Alias"],
             "User": item["User"],
+            "Puntaje ranking": unit_score[item["User"]],
+            "Ranking": unit_rank[item["User"]],
             "Indegree": item["Indegree"],
             "Clustering": item["Clustering"],
             "Betweenness": item["Betweenness"],
@@ -158,9 +193,20 @@ def build_rankings(game):
                 else:
                     row[delta_key] = "= 0"
 
+        if previous_unit_rank is None or item["User"] not in previous_unit_rank:
+            row["Δ Ranking"] = "—"
+        else:
+            delta_unit = previous_unit_rank[item["User"]] - unit_rank[item["User"]]
+            if delta_unit > 0:
+                row["Δ Ranking"] = f"↑ {delta_unit}"
+            elif delta_unit < 0:
+                row["Δ Ranking"] = f"↓ {abs(delta_unit)}"
+            else:
+                row["Δ Ranking"] = "= 0"
+
         rankings.append(row)
 
-    return sorted(rankings, key=lambda x: (-x["Indegree"], x["User"]))
+    return sorted(rankings, key=lambda x: (x["Ranking"], x["User"]))
 
 def check_identity(ID, PASSWORD):
     admins = load_admins()
@@ -307,8 +353,8 @@ def Changes_screen():
     if Round == 0:
         with st.form("NewConnections"):
             Available = st.session_state.Game.unconnectedOF(st.session_state.User.id)
-            available_aliases = ["-- No change --"] + to_alias_options(Available)
             available_alias_lookup = alias_to_user_map(Available)
+            available_aliases = ["-- No change --"] + to_alias_options(Available)
             "Choose 2 connections to add"
             "Connection 1"
             add1 = st.selectbox(
@@ -316,10 +362,13 @@ def Changes_screen():
                 available_aliases,
                 key="add1",
             )
+            available_for_add2 = [
+                alias for alias in available_aliases if alias == "-- No change --" or alias != add1
+            ]
             "Connection 2"
             add2 = st.selectbox(
                 "Add this connection",
-                available_aliases,
+                available_for_add2,
                 key="add2",
             )
             submitted = st.form_submit_button("Submit")
@@ -347,10 +396,10 @@ def Changes_screen():
         with st.form("NewConnections"):
             Available = st.session_state.Game.unconnectedOF(st.session_state.User.id)
             Connected = st.session_state.Game.connectionsOF(st.session_state.User.id)
-            available_aliases = ["-- No change --"] + to_alias_options(Available)
-            connected_aliases = ["-- No change --"] + to_alias_options(Connected)
             available_alias_lookup = alias_to_user_map(Available)
             connected_alias_lookup = alias_to_user_map(Connected)
+            available_aliases = ["-- No change --"] + to_alias_options(Available)
+            connected_aliases = ["-- No change --"] + to_alias_options(Connected)
             "Choose 2 connections to add"
             "Connection 1"
             add1 = st.selectbox(
@@ -358,10 +407,13 @@ def Changes_screen():
                 available_aliases,
                 key="add1",
             )
+            available_for_add2 = [
+                alias for alias in available_aliases if alias == "-- No change --" or alias != add1
+            ]
             "Connection 2"
             add2 = st.selectbox(
                 "Add this connection",
-                available_aliases,
+                available_for_add2,
                 key="add2",
             )
             "Remove Connection"
@@ -410,32 +462,50 @@ def Visualization():
         
         st.session_state.Game.compute_ranking()
         
-        st.session_state.RANK_DONE = st.session_state.Game.visualize()
+        st.session_state.RANK_DONE = st.session_state.Game.visualize(is_admin=st.session_state.IsAdmin)
 
 
 def Rankings_section():
-    st.subheader("Ranking de usuarios por stats")
-    st.caption("Ordenado por indegree. Cada stat incluye su ranking y variación respecto de la ronda anterior.")
+    st.subheader("Ranking de usuarios")
+    st.caption(
+        "El ranking se arma promediando la versión min-max de indegree, clustering y betweenness en la ronda actual."
+    )
 
     rankings = build_rankings(st.session_state.Game)
 
-    st.dataframe(
-        rankings,
-        use_container_width=True,
-        hide_index=True,
-        column_order=[
-            "Alias",
-            "Indegree",
-            "Rank Indegree",
-            "Δ Indegree",
-            "Clustering",
-            "Rank Clustering",
-            "Δ Clustering",
-            "Betweenness",
-            "Rank Betweenness",
-            "Δ Betweenness",
-        ],
-    )
+    if st.session_state.IsAdmin:
+        st.caption("Vista completa para administración, incluyendo métricas base y el detalle del ranking.")
+        st.dataframe(
+            rankings,
+            use_container_width=True,
+            hide_index=True,
+            column_order=[
+                "Alias",
+                "Ranking",
+                "Puntaje ranking",
+                "Δ Ranking",
+                "Indegree",
+                "Rank Indegree",
+                "Δ Indegree",
+                "Clustering",
+                "Rank Clustering",
+                "Δ Clustering",
+                "Betweenness",
+                "Rank Betweenness",
+                "Δ Betweenness",
+            ],
+        )
+    else:
+        st.dataframe(
+            rankings,
+            use_container_width=True,
+            hide_index=True,
+            column_order=[
+                "Alias",
+                "Ranking",
+                "Δ Ranking",
+            ],
+        )
 
 
 def round_from_filename(path):
